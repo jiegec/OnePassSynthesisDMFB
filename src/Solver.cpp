@@ -73,7 +73,42 @@ void Solver::print(const model &model) {
     char img_name[128];
     sprintf(img_name, "time%d.png", t);
     ofstream out(file_name);
-    out << "digraph step {rankdir=LR;node [shape=record];" << endl;
+    out << "digraph step {rankdir=LR;node "
+           "[shape=record,fontname=\"Inconsolata\"];"
+        << endl;
+    out << "dispenser [label=\"Dispensers:|" << endl;
+    bool first_dispenser = true;
+    for (int i = 0; i < graph.nodes.size(); i++) {
+      if (graph.nodes[i].type == DISPENSE) {
+        for (int j = 0; j < 2 * (width + height); j++) {
+          if (model.eval(dispenser[j][i]).bool_value() == Z3_L_TRUE) {
+            if (first_dispenser) {
+              first_dispenser = false;
+            } else {
+              out << "|";
+            }
+            out << "<d" << j << ">" << i;
+          }
+        }
+      }
+    }
+    out << "\"];" << endl;
+
+    out << "sink [label=\"Sinks:|" << endl;
+    bool first_sink = true;
+    for (int j = 0; j < 2 * (width + height); j++) {
+      if (model.eval(sink[j]).bool_value() == Z3_L_TRUE) {
+        if (first_sink) {
+          first_sink = false;
+        } else {
+          out << "|";
+        }
+        out << "<s" << j << ">"
+            << "S";
+      }
+    }
+    out << "\"];" << endl;
+
     out << "board [label=\"" << endl;
     cout << "time: " << t << endl;
     for (int i = 0; i < height; i++) {
@@ -81,18 +116,18 @@ void Solver::print(const model &model) {
         out << "|";
       }
       out << "{";
-      bool first = true;
       for (int j = 0; j < width; j++) {
+        out << "<f" << i << j << ">";
+
         bool flag = false;
         for (auto &node : graph.nodes) {
           if (node.type == DISPENSE || node.type == MIX) {
             if (model.eval(c[i][j][node.id][t]).bool_value() == Z3_L_TRUE) {
               cout << node.id << " ";
-              if (first) {
-                out << node.id;
-                first = false;
+              if (j != width - 1) {
+                out << node.id << "|";
               } else {
-                out << "|" << node.id;
+                out << node.id;
               }
               flag = true;
             }
@@ -100,12 +135,11 @@ void Solver::print(const model &model) {
         }
         if (!flag) {
           cout << "* ";
-          if (first) {
-            out << "E";
-            first = false;
+          if (j != width - 1) {
+            out << "E"
+                << "|";
           } else {
-            out << "|"
-                << "E";
+            out << "E";
           }
         }
       }
@@ -113,8 +147,53 @@ void Solver::print(const model &model) {
       cout << endl;
     }
     cout << endl;
-    out << "\"];}" << endl;
+    out << "\"];" << endl;
 
+    // dispensers
+    for (int i = 0; i < graph.nodes.size(); i++) {
+      if (graph.nodes[i].type == DISPENSE) {
+        for (int j = 0; j < 2 * (width + height); j++) {
+          int x = 0, y = 0;
+          if (j < width) {
+            y = width;
+          } else if (j < width + height) {
+            x = j - width;
+            y = width - 1;
+          } else if (j < width * 2 + height) {
+            x = height - 1;
+            y = width * 2 + height - j - 1;
+          } else {
+            x = (width + height) * 2 - j - 1;
+            y = 0;
+          }
+          if (model.eval(dispenser[j][i]).bool_value() == Z3_L_TRUE) {
+            out << "dispenser:d" << j << " -> board:f" << x << y << endl;
+          }
+        }
+      }
+    }
+
+    // sink
+    for (int j = 0; j < 2 * (width + height); j++) {
+      int x = 0, y = 0;
+      if (j < width) {
+        y = width;
+      } else if (j < width + height) {
+        x = j - width;
+        y = width - 1;
+      } else if (j < width * 2 + height) {
+        x = height - 1;
+        y = width * 2 + height - j - 1;
+      } else {
+        x = (width + height) * 2 - j - 1;
+        y = 0;
+      }
+      if (model.eval(sink[j]).bool_value() == Z3_L_TRUE) {
+        out << "sink:s" << j << " -> board:f" << x << y << endl;
+      }
+    }
+
+    out << "}" << endl;
     out.close();
     char cmd_line[128];
     sprintf(cmd_line, "dot -Tpng -o %s %s", img_name, file_name);
