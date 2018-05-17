@@ -1,9 +1,0 @@
-graph Tiny {
-0 [label="DIS1 0"]
-1 [label="DIS2 1"]
-2 [label="MIX1 2"]
-3 [label="OUTPUT1 3"]
-0 -- 2
-1 -- 2
-2 -- 3
-}

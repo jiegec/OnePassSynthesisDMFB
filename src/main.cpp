@@ -12,7 +12,7 @@ int main() {
   graph.print_to_graphviz("pcr.dot");
   system("dot -Tpng -o pcr.png pcr.dot");
   context c;
-  Solver solver(c, graph, 2, 2, 6);
+  Solver solver(c, graph, 3, 3, 6);
   auto ans = solver.get();
   auto model = ans.get_model();
   solver.print(model);

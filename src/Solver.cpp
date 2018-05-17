@@ -1,4 +1,5 @@
 #include "Solver.h"
+#include <fstream>
 #include <stdio.h>
 
 using namespace z3;
@@ -56,7 +57,7 @@ void Solver::print(const model &model) {
     if (graph.nodes[i].type == DISPENSE) {
       for (int j = 0; j < 2 * (width + height); j++) {
         if (model.eval(dispenser[j][i]).bool_value() == Z3_L_TRUE) {
-          cout << "Dispenser at " << j << " of type " << j << endl;
+          cout << "Dispenser at " << j << " of type " << i << endl;
         }
       }
     }
@@ -67,26 +68,59 @@ void Solver::print(const model &model) {
     }
   }
   for (int t = 1; t <= time; t++) {
+    char file_name[128];
+    sprintf(file_name, "time%d.dot", t);
+    char img_name[128];
+    sprintf(img_name, "time%d.png", t);
+    ofstream out(file_name);
+    out << "digraph step {rankdir=LR;node [shape=record];" << endl;
+    out << "board [label=\"" << endl;
     cout << "time: " << t << endl;
     for (int i = 0; i < height; i++) {
+      if (i != 0) {
+        out << "|";
+      }
+      out << "{";
+      bool first = true;
       for (int j = 0; j < width; j++) {
         bool flag = false;
         for (auto &node : graph.nodes) {
           if (node.type == DISPENSE || node.type == MIX) {
             if (model.eval(c[i][j][node.id][t]).bool_value() == Z3_L_TRUE) {
               cout << node.id << " ";
+              if (first) {
+                out << node.id;
+                first = false;
+              } else {
+                out << "|" << node.id;
+              }
               flag = true;
             }
           }
         }
-        if (!flag)
+        if (!flag) {
           cout << "* ";
+          if (first) {
+            out << "E";
+            first = false;
+          } else {
+            out << "|"
+                << "E";
+          }
+        }
       }
+      out << "}";
       cout << endl;
     }
-
     cout << endl;
+    out << "\"];}" << endl;
+
+    out.close();
+    char cmd_line[128];
+    sprintf(cmd_line, "dot -Tpng -o %s %s", img_name, file_name);
+    system(cmd_line);
   }
+  system("convert -delay 50 -loop 0 time*.png animation.gif");
 }
 
 void Solver::add_consistency(context &ctx) {
