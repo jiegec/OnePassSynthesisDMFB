@@ -38,12 +38,12 @@ bool try_steps(const Graph &graph, int n) {
   auto after = high_resolution_clock::now();
   cout << "Used " << duration_cast<milliseconds>(after - before).count() << "ms"
        << endl;
-  cout << ans.to_smt2() << endl;
   if (result != sat) {
     cerr << "Unsatisfiable" << endl;
   } else {
+    cout << ans.to_smt2() << endl;
     cout << "Satisfiable. Optimizing num of points." << endl;
-    int left = 0, right = 0x7fffffff;
+    int left = 0, right = solver.get_num_points();
     while (1) {
       int mid = left + ((right - left) >> 1);
       cout << "Trying " << mid << endl;
@@ -51,13 +51,14 @@ bool try_steps(const Graph &graph, int n) {
       auto temp_ans = temp.get_solver();
       if (temp_ans.check() == sat) {
         right = mid;
+      auto model = temp_ans.get_model();
+      solver.print(model);
       } else {
         left = mid + 1;
       }
 
       if (left >= right) {
-        auto model = temp_ans.get_model();
-        solver.print(model);
+        cout << "Minimum points: " << left << endl;
         return true;
       }
     }

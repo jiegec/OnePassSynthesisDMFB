@@ -27,8 +27,8 @@ const int neigh[][2] = {{-1, 0}, {0, -1}, {1, 0}, {0, 1}, {0, 0}};
 
 Solver::Solver(context &ctx, const Graph &graph, int width, int height,
                int time, int max_points)
-    : solver(ctx), opt(ctx), width(width), height(height), time(time),
-      graph(graph) {
+    : solver(ctx), width(width), height(height), time(time), graph(graph),
+      num_points(ctx) {
   char buffer[512];
   expr dummy(ctx);
   c.resize(height);
@@ -70,8 +70,9 @@ Solver::Solver(context &ctx, const Graph &graph, int width, int height,
     }
   }
 
-  //expr num_points = ctx.int_const("num_points");
-  solver.add(max_points >= sum(all_points));
+  num_points = ctx.int_const("num_points");
+  solver.add(num_points == sum(all_points));
+  solver.add(max_points >= num_points);
 
   add_consistency(ctx);
   add_placement(ctx);
@@ -79,7 +80,7 @@ Solver::Solver(context &ctx, const Graph &graph, int width, int height,
 }
 
 solver Solver::get_solver() { return solver; }
-optimize Solver::get_optimize() { return opt; }
+int Solver::get_num_points() { return solver.get_model().eval(num_points).get_numeral_int(); }
 
 void Solver::print(const model &model) {
   system("rm time*.png");
