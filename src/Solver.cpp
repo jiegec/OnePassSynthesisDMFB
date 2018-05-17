@@ -50,7 +50,7 @@ Solver::Solver(context &ctx, const Graph &graph, int width, int height,
   add_placement(ctx);
   add_movement(ctx);
 
-  cout << solver.to_smt2() << endl;
+  // cout << solver.to_smt2() << endl;
   if (solver.check() != sat) {
     cerr << "Unsatisfiable" << endl;
   }
@@ -60,6 +60,7 @@ solver Solver::get() { return solver; }
 
 void Solver::print(const model &model) {
   system("rm time*.png");
+  system("rm time*.dot");
   for (int i = 0; i < graph.nodes.size(); i++) {
     if (graph.nodes[i].type == DISPENSE) {
       for (int j = 0; j < 2 * (width + height); j++) {
@@ -380,8 +381,12 @@ void Solver::add_movement(context &ctx) {
                           appear_before_mix.push_back(
                               c[new_x][new_y][edges.first]
                                [t - graph.nodes[i].time - 1]);
+                        }
+                      }
+                      for (int ii = 0; ii < height; ii++) {
+                        for (int jj = 0; jj < width; jj++) {
                           disappear_on_mix.push_back(
-                              c[new_x][new_y][edges.first]
+                              c[ii][jj][edges.first]
                                [t - graph.nodes[i].time]);
                         }
                       }
@@ -404,7 +409,8 @@ void Solver::add_movement(context &ctx) {
                     }
                   }
                   mix_vec.push_back(mk_and(mixing_vec));
-                  movement.push_back(implies(mk_and(mixing_vec), c[x][y][graph.nodes[i].id][t]));
+                  movement.push_back(implies(mk_and(mixing_vec),
+                                             c[x][y][graph.nodes[i].id][t]));
 
                   vec.push_back(mk_and(mix_vec));
                 }
@@ -418,8 +424,7 @@ void Solver::add_movement(context &ctx) {
                   implies(c[x][y][graph.nodes[i].id][t], atmost(vec, 1)));
               movement.push_back(
                   implies(c[x][y][graph.nodes[i].id][t], atleast(vec, 1)));
-            }
-            else
+            } else
               movement.push_back(
                   implies(c[x][y][graph.nodes[i].id][t], ctx.bool_val(false)));
           }

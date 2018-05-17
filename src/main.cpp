@@ -1,5 +1,8 @@
 #include <iostream>
 #include <z3++.h>
+#include <chrono>
+
+using namespace std::chrono;
 
 #include "Graph.h"
 #include "Solver.h"
@@ -8,10 +11,15 @@ using namespace z3;
 using namespace std;
 
 bool try_steps(const Graph &graph, int n) {
+  cout << "Trying step " << n << endl;
   context c;
+  auto before = high_resolution_clock::now();
   Solver solver(c, graph, 10, 10, n);
+  auto after = high_resolution_clock::now();
+  cout << "Used " << duration_cast<milliseconds>(after - before).count() << "ms" << endl;
   auto ans = solver.get();
   if (ans.check() == sat) {
+    cout << ans.to_smt2() << endl;
     auto model = ans.get_model();
     solver.print(model);
     return true;

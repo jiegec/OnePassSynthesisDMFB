@@ -68,7 +68,7 @@ Graph::Graph(const char *file) {
 
 void Graph::print_to_graphviz(const char *file) {
   ofstream out(file);
-  out << "graph " << this->name << " {" << endl;
+  out << "graph \"" << this->name << "\" {" << endl;
   for (auto &node : this->nodes) {
     out << node.id << " [label=\"" << node.to_string() << "\"]" << endl;
   }
