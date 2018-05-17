@@ -4,14 +4,14 @@
 
 using namespace std;
 
-void trim(std::string& s) {
+void trim(std::string &s) {
   if (!s.empty()) {
     s.erase(0, s.find_first_not_of(" "));
     s.erase(s.find_last_not_of(" ") + 1);
   }
 }
 
-Graph::Graph(const char* file) {
+Graph::Graph(const char *file) {
   ifstream in(file);
   this->num_output = this->num_dispenser = 0;
   while (!in.eof()) {
@@ -66,13 +66,13 @@ Graph::Graph(const char* file) {
   }
 }
 
-void Graph::print_to_graphviz(const char* file) {
+void Graph::print_to_graphviz(const char *file) {
   ofstream out(file);
   out << "graph " << this->name << " {" << endl;
-  for (auto& node : this->nodes) {
+  for (auto &node : this->nodes) {
     out << node.id << " [label=\"" << node.to_string() << "\"]" << endl;
   }
-  for (auto& edge : this->edges) {
+  for (auto &edge : this->edges) {
     out << edge.first << " -- " << edge.second << endl;
   }
   out << "}" << endl;

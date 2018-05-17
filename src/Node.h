@@ -3,27 +3,25 @@
 
 #include <string>
 
-enum NodeType {
-    INVALID, DISPENSE, MIX, OUTPUT, DETECT
-};
+enum NodeType { INVALID, DISPENSE, MIX, OUTPUT, DETECT };
 
 struct Node {
-    int id;
-    NodeType type;
-    std::string label;
+  int id;
+  NodeType type;
+  std::string label;
 
-    // MIX
-    int time;
-    int drops;
+  // MIX
+  int time;
+  int drops;
 
-    // DISPENSE
-    std::string fluid_name;
-    int volume;
+  // DISPENSE
+  std::string fluid_name;
+  int volume;
 
-    // OUTPUT
-    std::string sink_name;
+  // OUTPUT
+  std::string sink_name;
 
-    std::string to_string();
+  std::string to_string();
 };
 
 #endif

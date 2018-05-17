@@ -27,7 +27,13 @@ Solver::Solver(context &ctx, const Graph &graph, int width, int height,
   for (int i = 0; i < height; i++) {
     c[i].resize(width);
     for (int j = 0; j < width; j++) {
+      // last one is 'mixing node'
       c[i][j].resize(graph.nodes.size() + 1);
+      c[i][j][graph.nodes.size()].resize(time + 1, dummy);
+      for (int t = 1; t <= time; t++) {
+        sprintf(buffer, "mixing_x%d_y%d_t%d", i, j, t);
+        c[i][j][graph.nodes.size()][t] = ctx.bool_const(buffer);
+      }
       for (auto &node : graph.nodes) {
         c[i][j][node.id].resize(time + 1, dummy);
         for (int t = 1; t <= time; t++) {
@@ -76,7 +82,7 @@ void Solver::print(const model &model) {
     out << "digraph step {rankdir=LR;node "
            "[shape=record,fontname=\"Inconsolata\"];"
         << endl;
-    out << "dispenser [label=\"Dispensers:|" << endl;
+    out << "dispenser [label=\"Dispensers:|";
     bool first_dispenser = true;
     for (int i = 0; i < graph.nodes.size(); i++) {
       if (graph.nodes[i].type == DISPENSE) {
@@ -94,7 +100,7 @@ void Solver::print(const model &model) {
     }
     out << "\"];" << endl;
 
-    out << "sink [label=\"Sinks:|" << endl;
+    out << "sink [label=\"Sinks:|";
     bool first_sink = true;
     for (int j = 0; j < 2 * (width + height); j++) {
       if (model.eval(sink[j]).bool_value() == Z3_L_TRUE) {
@@ -109,7 +115,7 @@ void Solver::print(const model &model) {
     }
     out << "\"];" << endl;
 
-    out << "board [label=\"" << endl;
+    out << "board [label=\"";
     cout << "time: " << t << endl;
     for (int i = 0; i < height; i++) {
       if (i != 0) {
@@ -134,12 +140,23 @@ void Solver::print(const model &model) {
           }
         }
         if (!flag) {
-          cout << "* ";
-          if (j != width - 1) {
-            out << "E"
-                << "|";
+          if (model.eval(c[i][j][graph.nodes.size()][t]).bool_value() ==
+              Z3_L_TRUE) {
+            cout << "M ";
+            if (j != width - 1) {
+              out << "M"
+                  << "|";
+            } else {
+              out << "M";
+            }
           } else {
-            out << "E";
+            cout << "* ";
+            if (j != width - 1) {
+              out << "E"
+                  << "|";
+            } else {
+              out << "E";
+            }
           }
         }
       }
@@ -155,7 +172,7 @@ void Solver::print(const model &model) {
         for (int j = 0; j < 2 * (width + height); j++) {
           int x = 0, y = 0;
           if (j < width) {
-            y = width;
+            y = j;
           } else if (j < width + height) {
             x = j - width;
             y = width - 1;
@@ -177,7 +194,7 @@ void Solver::print(const model &model) {
     for (int j = 0; j < 2 * (width + height); j++) {
       int x = 0, y = 0;
       if (j < width) {
-        y = width;
+        y = j;
       } else if (j < width + height) {
         x = j - width;
         y = width - 1;
@@ -344,40 +361,61 @@ void Solver::add_movement(context &ctx) {
             if (graph.nodes[i].type == MIX) {
               if (t >= graph.nodes[i].time + 2) {
                 const int mix_width = 2, mix_height = 2;
-                expr_vector mix_vec(ctx);
-                for (auto &edges : graph.edges) {
-                  if (edges.second == i) {
-                    // edges.first is an input liquid
-                    expr_vector appear_before_mix(ctx);
-                    expr_vector disappear_on_mix(ctx);
-                    for (int dir = 0; dir < 5; dir++) {
-                      int new_x = x + neigh[dir][0];
-                      int new_y = y + neigh[dir][1];
-                      if (0 <= new_x && new_x < height && 0 <= new_y &&
-                          new_y < width) {
-                        appear_before_mix.push_back(
-                            c[new_x][new_y][edges.first]
-                             [t - graph.nodes[i].time - 1]);
-                        disappear_on_mix.push_back(c[new_x][new_y][edges.first]
-                                                    [t - graph.nodes[i].time]);
+                if (0 <= x && x + mix_height - 1 < height && 0 <= y &&
+                    y + mix_width - 1 < width) {
+                  expr_vector mix_vec(ctx);
+                  for (auto &edges : graph.edges) {
+                    if (edges.second == i) {
+                      // edges.first is an input liquid
+                      expr_vector appear_before_mix(ctx);
+                      expr_vector disappear_on_mix(ctx);
+                      for (int dir = 0; dir < 5; dir++) {
+                        int new_x = x + neigh[dir][0];
+                        int new_y = y + neigh[dir][1];
+                        if (0 <= new_x && new_x < height && 0 <= new_y &&
+                            new_y < width) {
+                          appear_before_mix.push_back(
+                              c[new_x][new_y][edges.first]
+                               [t - graph.nodes[i].time - 1]);
+                          disappear_on_mix.push_back(
+                              c[new_x][new_y][edges.first]
+                               [t - graph.nodes[i].time]);
+                        }
+                      }
+                      // the liquid appears in the neighbour before mix
+                      mix_vec.push_back(mk_or(appear_before_mix));
+                      // the liquid disappears after mix
+                      mix_vec.push_back(not(mk_or(disappear_on_mix)));
+                    }
+                  }
+
+                  expr_vector mixing_vec(ctx);
+                  for (int ii = 0; ii < mix_width; ii++) {
+                    for (int jj = 0; jj < mix_height; jj++) {
+                      int new_x = x + ii;
+                      int new_y = y + jj;
+                      for (int tt = t - graph.nodes[i].time; tt < t; tt++) {
+                        mixing_vec.push_back(
+                            c[new_x][new_y][graph.nodes.size()][tt]);
                       }
                     }
-                    // the liquid appears in the neighbour before mix
-                    mix_vec.push_back(mk_or(appear_before_mix));
-                    // the liquid disappears after mix
-                    mix_vec.push_back(not(mk_or(disappear_on_mix)));
                   }
+                  mix_vec.push_back(mk_and(mixing_vec));
+                  movement.push_back(implies(mk_and(mixing_vec), c[x][y][graph.nodes[i].id][t]));
+
+                  vec.push_back(mk_and(mix_vec));
                 }
-                // TODO: occupy the space when mixing
-                vec.push_back(mk_and(mix_vec));
               } else {
-                // should never appear
                 vec.push_back(ctx.bool_val(false));
               }
             }
+
             if (vec.size() > 0)
               movement.push_back(
                   implies(c[x][y][graph.nodes[i].id][t], mk_or(vec)));
+            else
+              movement.push_back(
+                  implies(c[x][y][graph.nodes[i].id][t], ctx.bool_val(false)));
           }
         }
       }
