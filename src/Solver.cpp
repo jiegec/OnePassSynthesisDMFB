@@ -59,6 +59,7 @@ Solver::Solver(context &ctx, const Graph &graph, int width, int height,
 solver Solver::get() { return solver; }
 
 void Solver::print(const model &model) {
+  system("rm time*.png");
   for (int i = 0; i < graph.nodes.size(); i++) {
     if (graph.nodes[i].type == DISPENSE) {
       for (int j = 0; j < 2 * (width + height); j++) {
@@ -232,6 +233,8 @@ void Solver::add_consistency(context &ctx) {
             vec.push_back(c[i][j][node.id][t]);
           }
         }
+        // Mixing node
+        vec.push_back(c[i][j][graph.nodes.size()][t]);
         consistency1_vec.push_back(atmost(vec, 1));
       }
     }
@@ -410,9 +413,12 @@ void Solver::add_movement(context &ctx) {
               }
             }
 
-            if (vec.size() > 0)
+            if (vec.size() > 0) {
               movement.push_back(
-                  implies(c[x][y][graph.nodes[i].id][t], mk_or(vec)));
+                  implies(c[x][y][graph.nodes[i].id][t], atmost(vec, 1)));
+              movement.push_back(
+                  implies(c[x][y][graph.nodes[i].id][t], atleast(vec, 1)));
+            }
             else
               movement.push_back(
                   implies(c[x][y][graph.nodes[i].id][t], ctx.bool_val(false)));

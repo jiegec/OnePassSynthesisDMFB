@@ -7,14 +7,26 @@
 using namespace z3;
 using namespace std;
 
-int main() {
-  Graph graph("../../testcase/Single_2_Input_Mix.txt");
-  graph.print_to_graphviz("pcr.dot");
-  system("dot -Tpng -o pcr.png pcr.dot");
+bool try_steps(const Graph &graph, int n) {
   context c;
-  Solver solver(c, graph, 3, 3, 6);
+  Solver solver(c, graph, 10, 10, n);
   auto ans = solver.get();
-  auto model = ans.get_model();
-  solver.print(model);
+  if (ans.check() == sat) {
+    auto model = ans.get_model();
+    solver.print(model);
+    return true;
+  }
+  return false;
+}
+
+int main(int argc, char **argv) {
+  const char *filename = "../../testcase/Single_2_Input_Mix.txt";
+  if (argc > 1) {
+    filename = argv[1];
+  }
+  Graph graph(filename);
+  graph.print_to_graphviz("input.dot");
+  system("dot -Tpng -o input.png input.dot");
+  for (int i = 0;try_steps(graph, i) == false;i++);
   return 0;
 }
