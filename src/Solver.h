@@ -25,8 +25,9 @@
 
 class Solver {
  public:
-  Solver(z3::context& c, const Graph& graph, int width, int height, int time);
-  z3::solver get();
+  Solver(z3::context& c, const Graph& graph, int width, int height, int time, int max_points);
+  z3::solver get_solver();
+  z3::optimize get_optimize();
   void print(const z3::model & model);
 
  private:
@@ -36,6 +37,7 @@ class Solver {
 
 
   z3::solver solver;
+  z3::optimize opt;
   std::vector<std::vector<std::vector<std::vector<z3::expr>>>>
       c;  // c_{x,y,i}^t
   int width;

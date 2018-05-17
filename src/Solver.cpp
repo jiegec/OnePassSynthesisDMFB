@@ -1,20 +1,20 @@
 // Copyright (C) 2018 Jiajie Chen
-// 
+//
 // This file is part of OnePassSynthesisDMFB.
-// 
+//
 // OnePassSynthesisDMFB is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // OnePassSynthesisDMFB is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU General Public License
 // along with OnePassSynthesisDMFB.  If not, see <http://www.gnu.org/licenses/>.
-// 
+//
 
 #include "Solver.h"
 #include <fstream>
@@ -26,8 +26,9 @@ using namespace std;
 const int neigh[][2] = {{-1, 0}, {0, -1}, {1, 0}, {0, 1}, {0, 0}};
 
 Solver::Solver(context &ctx, const Graph &graph, int width, int height,
-               int time)
-    : solver(ctx), width(width), height(height), time(time), graph(graph) {
+               int time, int max_points)
+    : solver(ctx), opt(ctx), width(width), height(height), time(time),
+      graph(graph) {
   char buffer[512];
   expr dummy(ctx);
   c.resize(height);
@@ -42,6 +43,9 @@ Solver::Solver(context &ctx, const Graph &graph, int width, int height,
       dispenser[i][j] = ctx.bool_const(buffer);
     }
   }
+  expr_vector all_points(ctx);
+  expr zero = ctx.int_val(0);
+  expr one = ctx.int_val(1);
   for (int i = 0; i < height; i++) {
     c[i].resize(width);
     for (int j = 0; j < width; j++) {
@@ -51,6 +55,7 @@ Solver::Solver(context &ctx, const Graph &graph, int width, int height,
       for (int t = 1; t <= time; t++) {
         sprintf(buffer, "mixing_x%d_y%d_t%d", i, j, t);
         c[i][j][graph.nodes.size()][t] = ctx.bool_const(buffer);
+        all_points.push_back(ite(c[i][j][graph.nodes.size()][t], one, zero));
       }
       for (auto &node : graph.nodes) {
         c[i][j][node.id].resize(time + 1, dummy);
@@ -58,23 +63,23 @@ Solver::Solver(context &ctx, const Graph &graph, int width, int height,
           if (node.type == DISPENSE || node.type == MIX) {
             sprintf(buffer, "c_x%d_y%d_i%d_t%d", i, j, node.id, t);
             c[i][j][node.id][t] = ctx.bool_const(buffer);
+            all_points.push_back(ite(c[i][j][node.id][t], one, zero));
           }
         }
       }
     }
   }
 
+  //expr num_points = ctx.int_const("num_points");
+  solver.add(max_points >= sum(all_points));
+
   add_consistency(ctx);
   add_placement(ctx);
   add_movement(ctx);
-
-  // cout << solver.to_smt2() << endl;
-  if (solver.check() != sat) {
-    cerr << "Unsatisfiable" << endl;
-  }
 }
 
-solver Solver::get() { return solver; }
+solver Solver::get_solver() { return solver; }
+optimize Solver::get_optimize() { return opt; }
 
 void Solver::print(const model &model) {
   system("rm time*.png");
@@ -279,7 +284,7 @@ void Solver::add_consistency(context &ctx) {
   solver.add(mk_and(consistency2_vec));
 
   // in each position p outside of the grid, there may be at
-  // most one dispenser
+  // most one dispenser and sink
   expr_vector consistency3_vec(ctx);
   for (int i = 0; i < 2 * (width + height); i++) {
     expr_vector vec(ctx);
@@ -343,7 +348,6 @@ void Solver::add_placement(context &ctx) {
 }
 
 void Solver::add_movement(context &ctx) {
-  expr_vector movement(ctx);
   for (int i = 0; i < graph.nodes.size(); i++) {
     if (graph.nodes[i].type == DISPENSE || graph.nodes[i].type == MIX) {
       for (int x = 0; x < height; x++) {
@@ -404,8 +408,7 @@ void Solver::add_movement(context &ctx) {
                       for (int ii = 0; ii < height; ii++) {
                         for (int jj = 0; jj < width; jj++) {
                           disappear_on_mix.push_back(
-                              c[ii][jj][edges.first]
-                               [t - graph.nodes[i].time]);
+                              c[ii][jj][edges.first][t - graph.nodes[i].time]);
                         }
                       }
                       // the liquid appears in the neighbour before mix
@@ -427,30 +430,26 @@ void Solver::add_movement(context &ctx) {
                     }
                   }
                   mix_vec.push_back(mk_and(mixing_vec));
-                  movement.push_back(implies(mk_and(mixing_vec),
-                                             c[x][y][graph.nodes[i].id][t]));
 
                   vec.push_back(mk_and(mix_vec));
                 }
-              } else {
-                vec.push_back(ctx.bool_val(false));
               }
             }
 
             if (vec.size() > 0) {
-              movement.push_back(
+              solver.add(
                   implies(c[x][y][graph.nodes[i].id][t], atmost(vec, 1)));
-              movement.push_back(
+              solver.add(
                   implies(c[x][y][graph.nodes[i].id][t], atleast(vec, 1)));
             } else
-              movement.push_back(
+              solver.add(
                   implies(c[x][y][graph.nodes[i].id][t], ctx.bool_val(false)));
           }
         }
       }
     }
   }
-  solver.add(mk_and(movement));
+  // solver.add(mk_and(movement));
 
   // OUTPUT: liquid should be output to sink
   for (int i = 0; i < graph.nodes.size(); i++) {
@@ -489,19 +488,22 @@ void Solver::add_movement(context &ctx) {
                 if (y == width - 1) {
                   adj_sink.push_back(sink[width + x]);
                 }
-                solver.add(implies(disappear, mk_or(adj_sink)));
-
-                // edges.first should not appear at the last time
-                expr_vector disappear_last(ctx);
-                for (int x = 0; x < height; x++) {
-                  for (int y = 0; y < width; y++) {
-                    disappear_last.push_back(c[x][y][edges.first][time]);
-                  }
-                }
-                solver.add(not(mk_or(disappear_last)));
+                if (adj_sink.size())
+                  solver.add(implies(disappear, mk_or(adj_sink)));
+                else
+                  solver.add(implies(disappear, false));
               }
             }
           }
+
+          // edges.first should not appear at the last time
+          expr_vector disappear_last(ctx);
+          for (int x = 0; x < height; x++) {
+            for (int y = 0; y < width; y++) {
+              disappear_last.push_back(c[x][y][edges.first][time]);
+            }
+          }
+          solver.add(not(mk_or(disappear_last)));
           break;
         }
       }
