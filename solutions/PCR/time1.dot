@@ -1,14 +1,14 @@
 digraph step {rankdir=LR;node [shape=record,fontname="Inconsolata"];
-dispenser [label="Dispensers:|<d1>0|<d13>1|<d18>3|<d0>4|<d14>6|<d12>7|<d15>9|<d16>10"];
+dispenser [label="Dispensers:|<d16>0|<d18>1|<d0>3|<d1>4|<d11>6|<d8>7|<d6>9|<d3>10"];
 sink [label="Sinks:|<s17>S"];
-board [label="{<f00>4|<f01>0|<f02>E|<f03>E|<f04>E}|{<f10>3|<f11>E|<f12>E|<f13>E|<f14>E}|{<f20>E|<f21>E|<f22>E|<f23>E|<f24>E}|{<f30>E|<f31>E|<f32>E|<f33>E|<f34>E}|{<f40>6|<f41>1|<f42>7|<f43>E|<f44>E}"];
-dispenser:d1 -> board:f01
-dispenser:d13 -> board:f41
+board [label="{<f00>E|<f01>E|<f02>E|<f03>10|<f04>E}|{<f10>E|<f11>E|<f12>E|<f13>E|<f14>9}|{<f20>E|<f21>E|<f22>E|<f23>E|<f24>E}|{<f30>E|<f31>E|<f32>E|<f33>E|<f34>7}|{<f40>E|<f41>E|<f42>E|<f43>6|<f44>E}"];
+dispenser:d16 -> board:f30
 dispenser:d18 -> board:f10
 dispenser:d0 -> board:f00
-dispenser:d14 -> board:f40
-dispenser:d12 -> board:f42
-dispenser:d15 -> board:f40
-dispenser:d16 -> board:f30
+dispenser:d1 -> board:f01
+dispenser:d11 -> board:f43
+dispenser:d8 -> board:f34
+dispenser:d6 -> board:f14
+dispenser:d3 -> board:f03
 sink:s17 -> board:f20
 }
