@@ -28,11 +28,11 @@ using namespace std::chrono;
 using namespace z3;
 using namespace std;
 
-bool try_steps(const Graph &graph, int n) {
+bool try_steps(const Graph &graph, int width, int height, int n) {
   cout << "Trying step " << n << endl;
   context c;
   auto before = high_resolution_clock::now();
-  Solver solver(c, graph, 5, 5, n, 0x7fffffff);
+  Solver solver(c, graph, width, height, n, 0x7fffffff);
   auto ans = solver.get_solver();
   auto result = ans.check();
   auto after = high_resolution_clock::now();
@@ -47,14 +47,21 @@ bool try_steps(const Graph &graph, int n) {
     while (1) {
       int mid = left + ((right - left) >> 1);
       cout << "Trying " << mid << endl;
-      Solver temp(c, graph, 5, 5, n, mid);
+      Solver temp(c, graph, width, height, n, mid);
       auto temp_ans = temp.get_solver();
-      if (temp_ans.check() == sat) {
+      before = high_resolution_clock::now();
+      auto temp_result = temp_ans.check();
+      after = high_resolution_clock::now();
+      cout << "Used " << duration_cast<milliseconds>(after - before).count()
+           << "ms" << endl;
+      if (temp_result == sat) {
         right = mid;
-      auto model = temp_ans.get_model();
-      solver.print(model);
+        auto model = temp_ans.get_model();
+        solver.print(model);
+        cout << "Satisfiable." << endl;
       } else {
         left = mid + 1;
+        cout << "Unsatisfiable." << endl;
       }
 
       if (left >= right) {
@@ -75,7 +82,7 @@ int main(int argc, char **argv) {
   graph.print_to_graphviz("input.dot");
   system("dot -Tpng -o input.png input.dot");
   // try_steps(graph, 6);
-  for (int i = 1; try_steps(graph, i) == false; i++)
+  for (int i = 1; try_steps(graph, 5, 5, i) == false; i++)
     ;
   return 0;
 }

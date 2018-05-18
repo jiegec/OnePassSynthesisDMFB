@@ -49,13 +49,16 @@ Solver::Solver(context &ctx, const Graph &graph, int width, int height,
   for (int i = 0; i < height; i++) {
     c[i].resize(width);
     for (int j = 0; j < width; j++) {
-      // last one is 'mixing node'
-      c[i][j].resize(graph.nodes.size() + 1);
-      c[i][j][graph.nodes.size()].resize(time + 1, dummy);
-      for (int t = 1; t <= time; t++) {
-        sprintf(buffer, "mixing_x%d_y%d_t%d", i, j, t);
-        c[i][j][graph.nodes.size()][t] = ctx.bool_const(buffer);
-        all_points.push_back(ite(c[i][j][graph.nodes.size()][t], one, zero));
+      // index graph.nodes.size() + id is mixing node
+      c[i][j].resize(graph.nodes.size() * 2);
+      for (int id = 0; id < graph.nodes.size(); id++) {
+        c[i][j][graph.nodes.size() + id].resize(time + 1, dummy);
+        for (int t = 1; t <= time; t++) {
+          sprintf(buffer, "mixing_x%d_y%d_i%d_t%d", i, j, id, t);
+          c[i][j][graph.nodes.size() + id][t] = ctx.bool_const(buffer);
+          all_points.push_back(
+              ite(c[i][j][graph.nodes.size() + id][t], one, zero));
+        }
       }
       for (auto &node : graph.nodes) {
         c[i][j][node.id].resize(time + 1, dummy);
@@ -80,7 +83,9 @@ Solver::Solver(context &ctx, const Graph &graph, int width, int height,
 }
 
 solver Solver::get_solver() { return solver; }
-int Solver::get_num_points() { return solver.get_model().eval(num_points).get_numeral_int(); }
+int Solver::get_num_points() {
+  return solver.get_model().eval(num_points).get_numeral_int();
+}
 
 void Solver::print(const model &model) {
   system("rm time*.png");
@@ -166,16 +171,22 @@ void Solver::print(const model &model) {
           }
         }
         if (!flag) {
-          if (model.eval(c[i][j][graph.nodes.size()][t]).bool_value() ==
-              Z3_L_TRUE) {
-            cout << "M ";
-            if (j != width - 1) {
-              out << "M"
-                  << "|";
-            } else {
-              out << "M";
+          bool mixing = false;
+          for (int id = 0; id < graph.nodes.size(); id++) {
+            if (model.eval(c[i][j][graph.nodes.size() + id][t]).bool_value() ==
+                Z3_L_TRUE) {
+              mixing = true;
+              cout << "M ";
+              if (j != width - 1) {
+                out << "M"
+                    << "|";
+              } else {
+                out << "M";
+              }
+              break;
             }
-          } else {
+          }
+          if (!mixing) {
             cout << "* ";
             if (j != width - 1) {
               out << "E"
@@ -258,8 +269,10 @@ void Solver::add_consistency(context &ctx) {
             vec.push_back(c[i][j][node.id][t]);
           }
         }
-        // Mixing node
-        vec.push_back(c[i][j][graph.nodes.size()][t]);
+        // Mixing nodes
+        for (int id = 0; id < graph.nodes.size(); id++) {
+          vec.push_back(c[i][j][graph.nodes.size() + id][t]);
+        }
         consistency1_vec.push_back(atmost(vec, 1));
       }
     }
@@ -426,7 +439,8 @@ void Solver::add_movement(context &ctx) {
                       int new_y = y + jj;
                       for (int tt = t - graph.nodes[i].time; tt < t; tt++) {
                         mixing_vec.push_back(
-                            c[new_x][new_y][graph.nodes.size()][tt]);
+                            c[new_x][new_y]
+                             [graph.nodes.size() + graph.nodes[i].id][tt]);
                       }
                     }
                   }
