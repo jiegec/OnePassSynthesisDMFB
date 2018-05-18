@@ -26,7 +26,7 @@ using namespace std;
 const int neigh[][2] = {{-1, 0}, {0, -1}, {1, 0}, {0, 1}, {0, 0}};
 
 Solver::Solver(context &ctx, const Graph &graph, int width, int height,
-               int time, int max_points)
+               int time)
     : solver(ctx), num_points_handle(0), width(width), height(height),
       time(time), graph(graph), num_points(ctx) {
   char buffer[512];
@@ -75,7 +75,6 @@ Solver::Solver(context &ctx, const Graph &graph, int width, int height,
 
   num_points = ctx.int_const("num_points");
   solver.add(num_points == sum(all_points));
-  solver.add(max_points >= num_points);
   num_points_handle = solver.minimize(num_points);
 
   add_consistency(ctx);

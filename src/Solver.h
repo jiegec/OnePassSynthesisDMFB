@@ -25,7 +25,7 @@
 
 class Solver {
  public:
-  Solver(z3::context& c, const Graph& graph, int width, int height, int time, int max_points);
+  Solver(z3::context& c, const Graph& graph, int width, int height, int time);
   z3::optimize& get_solver();
   int get_num_points();
   void print(const z3::model & model);
