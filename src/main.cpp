@@ -29,46 +29,57 @@ using namespace z3;
 using namespace std;
 
 bool try_steps(const Graph &graph, int width, int height, int n) {
-  cout << "Trying step " << n << endl;
-  context c;
-  auto before = high_resolution_clock::now();
-  Solver solver(c, graph, width, height, n, 0x7fffffff);
-  auto ans = solver.get_solver();
-  auto result = ans.check();
-  auto after = high_resolution_clock::now();
-  cout << "Used " << duration_cast<milliseconds>(after - before).count() << "ms"
-       << endl;
-  if (result != sat) {
-    cerr << "Unsatisfiable" << endl;
-  } else {
-    cout << ans.to_smt2() << endl;
-    cout << "Satisfiable. Optimizing num of points." << endl;
-    int left = 0, right = solver.get_num_points();
-    while (1) {
-      int mid = left + ((right - left) >> 1);
-      cout << "Trying " << mid << endl;
-      Solver temp(c, graph, width, height, n, mid);
-      auto temp_ans = temp.get_solver();
-      before = high_resolution_clock::now();
-      auto temp_result = temp_ans.check();
-      after = high_resolution_clock::now();
-      cout << "Used " << duration_cast<milliseconds>(after - before).count()
-           << "ms" << endl;
-      if (temp_result == sat) {
-        right = mid;
-        auto model = temp_ans.get_model();
-        solver.print(model);
-        cout << "Satisfiable." << endl;
-      } else {
-        left = mid + 1;
-        cout << "Unsatisfiable." << endl;
-      }
+  try {
+    cout << "Trying step " << n << endl;
+    context c;
+    auto before = high_resolution_clock::now();
+    Solver solver(c, graph, width, height, n, 0x7fffffff);
+    auto& ans = solver.get_solver();
+    auto result = ans.check();
+    auto after = high_resolution_clock::now();
+    cout << "Used " << duration_cast<milliseconds>(after - before).count()
+         << "ms" << endl;
+    // cout << ans;
+    if (result != sat) {
+      cout << "Unsatisfiable" << endl;
+    } else {
+      cout << "Satisfiable" << endl;
+      auto model = ans.get_model();
+      solver.print(model);
+      return true;
+      // cout << ans.to_smt2() << endl;
+      /*
+      cout << "Satisfiable. Optimizing num of points." << endl;
+      int left = 0, right = solver.get_num_points();
+      while (1) {
+        int mid = left + ((right - left) >> 1);
+        cout << "Trying " << mid << endl;
+        Solver temp(c, graph, width, height, n, mid);
+        auto temp_ans = temp.get_solver();
+        before = high_resolution_clock::now();
+        auto temp_result = temp_ans.check();
+        after = high_resolution_clock::now();
+        cout << "Used " << duration_cast<milliseconds>(after - before).count()
+             << "ms" << endl;
+        if (temp_result == sat) {
+          right = mid;
+          auto model = temp_ans.get_model();
+          solver.print(model);
+          cout << "Satisfiable." << endl;
+        } else {
+          left = mid + 1;
+          cout << "Unsatisfiable." << endl;
+        }
 
-      if (left >= right) {
-        cout << "Minimum points: " << left << endl;
-        return true;
+        if (left >= right) {
+          cout << "Minimum points: " << left << endl;
+          return true;
+        }
       }
+      */
     }
+  } catch (z3::exception e) {
+    cerr << e.msg() << endl;
   }
   return false;
 }

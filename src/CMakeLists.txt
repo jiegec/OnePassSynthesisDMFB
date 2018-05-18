@@ -3,6 +3,7 @@ project(OnePassSynthesisDMFB)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
 
 find_path(Z3_INCLUDE_DIR z3++.h)
 find_library(Z3_LIBRARY z3)
