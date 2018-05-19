@@ -137,11 +137,14 @@ void Solver::print(const model &model) {
     }
   }
 
+  vector<string> image_names;
   for (int t = 1; t <= time; t++) {
     char file_name[128];
     sprintf(file_name, "time%d.dot", t);
     char img_name[128];
     sprintf(img_name, "time%d.png", t);
+    // wildcard is not lexigraphically sorted
+    image_names.push_back(img_name);
     ofstream out(file_name);
     out << "digraph step {rankdir=LR;node "
            "[shape=record,fontname=\"Inconsolata\"];"
@@ -327,7 +330,8 @@ void Solver::print(const model &model) {
           for (auto &edge : graph.edges) {
             if (edge.first == id && graph.nodes[edge.second].type == DETECT) {
               if (model.eval(detector[i][j][id]).bool_value() == Z3_L_TRUE) {
-                out << "detector:D" << i << j << " -> board:f" << i << j << endl;
+                out << "detector:D" << i << j << " -> board:f" << i << j
+                    << endl;
               }
               break;
             }
@@ -342,7 +346,12 @@ void Solver::print(const model &model) {
     sprintf(cmd_line, "dot -Tpng -o %s %s", img_name, file_name);
     system(cmd_line);
   }
-  system("convert -delay 50 -loop 0 time*.png animation.gif");
+  string cmd_line = "convert -delay 50 -loop 0";
+  for (auto &file : image_names) {
+    cmd_line += " " + file;
+  }
+  cmd_line += " animation.gif";
+  system(cmd_line.c_str());
 }
 
 void Solver::add_consistency(context &ctx) {

@@ -1,0 +1,13 @@
+digraph step {rankdir=LR;node [shape=record,fontname="Inconsolata"];
+dispenser [label="Dispensers:|<d19>0|<d1>1|<d3>3|<d4>4"];
+sink [label="Sinks:|<s2>S"];
+detector [label="Detectors:|<D01>2|<D03>5"];
+board [label="{<f00>E|<f01>E|<f02>8|<f03>E|<f04>E}|{<f10>E|<f11>E|<f12>E|<f13>E|<f14>E}|{<f20>E|<f21>E|<f22>E|<f23>E|<f24>E}|{<f30>E|<f31>E|<f32>E|<f33>E|<f34>E}|{<f40>E|<f41>E|<f42>E|<f43>E|<f44>E}"];
+dispenser:d19 -> board:f00
+dispenser:d1 -> board:f01
+dispenser:d3 -> board:f03
+dispenser:d4 -> board:f04
+sink:s2 -> board:f02
+detector:D01 -> board:f01
+detector:D03 -> board:f03
+}
