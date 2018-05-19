@@ -528,53 +528,63 @@ void Solver::add_movement(context &ctx) {
             // If it is an output from a MIX operation
             if (graph.nodes[i].type == MIX) {
               if (t >= graph.nodes[i].time + 2) {
+                int direction[4][2] = {{1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
                 const int mix_width = 2, mix_height = 2;
-                if (0 <= x && x + mix_height - 1 < height && 0 <= y &&
-                    y + mix_width - 1 < width) {
-                  expr_vector mix_vec(ctx);
-                  for (auto &edges : graph.edges) {
-                    if (edges.second == i) {
-                      // edges.first is an input liquid
-                      expr_vector appear_before_mix(ctx);
-                      expr_vector disappear_on_mix(ctx);
-                      for (int dir = 0; dir < 5; dir++) {
-                        int new_x = x + neigh[dir][0];
-                        int new_y = y + neigh[dir][1];
-                        if (0 <= new_x && new_x < height && 0 <= new_y &&
-                            new_y < width) {
-                          appear_before_mix.push_back(
-                              c[new_x][new_y][edges.first]
-                               [t - graph.nodes[i].time - 1]);
-                        }
-                      }
-                      for (int ii = 0; ii < height; ii++) {
-                        for (int jj = 0; jj < width; jj++) {
-                          disappear_on_mix.push_back(
-                              c[ii][jj][edges.first][t - graph.nodes[i].time]);
-                        }
-                      }
-                      // the liquid appears in the neighbour before mix
-                      mix_vec.push_back(mk_or(appear_before_mix));
-                      // the liquid disappears after mix
-                      mix_vec.push_back(not(mk_or(disappear_on_mix)));
-                    }
-                  }
+                for (int way = 0; way < 4; way++) {
+                  int dir_x = direction[way][0];
+                  int dir_y = direction[way][1];
 
-                  expr_vector mixing_vec(ctx);
-                  for (int ii = 0; ii < mix_width; ii++) {
-                    for (int jj = 0; jj < mix_height; jj++) {
-                      int new_x = x + ii;
-                      int new_y = y + jj;
-                      for (int tt = t - graph.nodes[i].time; tt < t; tt++) {
-                        mixing_vec.push_back(
-                            c[new_x][new_y]
-                             [graph.nodes.size() + graph.nodes[i].id][tt]);
+                  if (0 <= x && x < height &&
+                      0 <= x + (mix_height - 1) * dir_x &&
+                      x + (mix_height - 1) * dir_x < height && 0 <= y &&
+                      y < width && 0 <= y + (mix_width - 1) * dir_y &&
+                      y + (mix_width - 1) * dir_y < width) {
+                    expr_vector mix_vec(ctx);
+                    for (auto &edges : graph.edges) {
+                      if (edges.second == i) {
+                        // edges.first is an input liquid
+                        expr_vector appear_before_mix(ctx);
+                        expr_vector disappear_on_mix(ctx);
+                        for (int dir = 0; dir < 5; dir++) {
+                          int new_x = x + neigh[dir][0];
+                          int new_y = y + neigh[dir][1];
+                          if (0 <= new_x && new_x < height && 0 <= new_y &&
+                              new_y < width) {
+                            appear_before_mix.push_back(
+                                c[new_x][new_y][edges.first]
+                                 [t - graph.nodes[i].time - 1]);
+                          }
+                        }
+                        for (int ii = 0; ii < height; ii++) {
+                          for (int jj = 0; jj < width; jj++) {
+                            disappear_on_mix.push_back(
+                                c[ii][jj][edges.first]
+                                 [t - graph.nodes[i].time]);
+                          }
+                        }
+                        // the liquid appears in the neighbour before mix
+                        mix_vec.push_back(mk_or(appear_before_mix));
+                        // the liquid disappears after mix
+                        mix_vec.push_back(not(mk_or(disappear_on_mix)));
                       }
                     }
-                  }
-                  mix_vec.push_back(mk_and(mixing_vec));
 
-                  vec.push_back(mk_and(mix_vec));
+                    expr_vector mixing_vec(ctx);
+                    for (int ii = 0; ii < mix_width; ii++) {
+                      for (int jj = 0; jj < mix_height; jj++) {
+                        int new_x = x + ii * dir_x;
+                        int new_y = y + jj * dir_y;
+                        for (int tt = t - graph.nodes[i].time; tt < t; tt++) {
+                          mixing_vec.push_back(
+                              c[new_x][new_y]
+                               [graph.nodes.size() + graph.nodes[i].id][tt]);
+                        }
+                      }
+                    }
+                    mix_vec.push_back(mk_and(mixing_vec));
+
+                    vec.push_back(mk_and(mix_vec));
+                  }
                 }
               }
             }
