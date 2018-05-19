@@ -46,24 +46,39 @@ Solver::Solver(context &ctx, const Graph &graph, int width, int height,
   expr_vector all_points(ctx);
   expr zero = ctx.int_val(0);
   expr one = ctx.int_val(1);
+  detector.resize(height);
   for (int i = 0; i < height; i++) {
     c[i].resize(width);
+    detector[i].resize(width);
     for (int j = 0; j < width; j++) {
-      // index graph.nodes.size() + id is mixing node
+      // index graph.nodes.size() + id is mixing/detecting node
       c[i][j].resize(graph.nodes.size() * 2);
+      detector[i][j].resize(graph.nodes.size(), dummy);
       for (int id = 0; id < graph.nodes.size(); id++) {
+        sprintf(buffer, "detector_x%d_y%d_i%d", i, j, id);
+        detector[i][j][id] = ctx.bool_const(buffer);
+
+        // mixing/detecting nodes
         c[i][j][graph.nodes.size() + id].resize(time + 1, dummy);
         for (int t = 1; t <= time; t++) {
-          sprintf(buffer, "mixing_x%d_y%d_i%d_t%d", i, j, id, t);
-          c[i][j][graph.nodes.size() + id][t] = ctx.bool_const(buffer);
-          all_points.push_back(
-              ite(c[i][j][graph.nodes.size() + id][t], one, zero));
+          if (graph.nodes[id].type == MIX) {
+            sprintf(buffer, "mixing_x%d_y%d_i%d_t%d", i, j, id, t);
+            c[i][j][graph.nodes.size() + id][t] = ctx.bool_const(buffer);
+            all_points.push_back(
+                ite(c[i][j][graph.nodes.size() + id][t], one, zero));
+          } else if (graph.nodes[id].type == DETECT) {
+            sprintf(buffer, "detecting_%d_y%d_i%d_t%d", i, j, id, t);
+            c[i][j][graph.nodes.size() + id][t] = ctx.bool_const(buffer);
+            all_points.push_back(
+                ite(c[i][j][graph.nodes.size() + id][t], one, zero));
+          }
         }
       }
       for (auto &node : graph.nodes) {
         c[i][j][node.id].resize(time + 1, dummy);
         for (int t = 1; t <= time; t++) {
-          if (node.type == DISPENSE || node.type == MIX) {
+          if (node.type == DISPENSE || node.type == MIX ||
+              node.type == DETECT) {
             sprintf(buffer, "c_x%d_y%d_i%d_t%d", i, j, node.id, t);
             c[i][j][node.id][t] = ctx.bool_const(buffer);
             all_points.push_back(ite(c[i][j][node.id][t], one, zero));
@@ -82,9 +97,8 @@ Solver::Solver(context &ctx, const Graph &graph, int width, int height,
   add_movement(ctx);
 }
 
-optimize& Solver::get_solver() { return solver; }
+optimize &Solver::get_solver() { return solver; }
 int Solver::get_num_points() {
-  // return solver.get_model().eval(num_points).get_numeral_int();
   return solver.lower(num_points_handle).get_numeral_int();
 }
 
@@ -100,11 +114,29 @@ void Solver::print(const model &model) {
       }
     }
   }
+
   for (int i = 0; i < 2 * (width + height); i++) {
     if (model.eval(sink[i]).bool_value() == Z3_L_TRUE) {
       cout << "Sink at " << i << endl;
     }
   }
+
+  for (int i = 0; i < height; i++) {
+    for (int j = 0; j < width; j++) {
+      for (int id = 0; id < graph.nodes.size(); id++) {
+        for (auto &edge : graph.edges) {
+          if (edge.first == id && graph.nodes[edge.second].type == DETECT) {
+            if (model.eval(detector[i][j][id]).bool_value() == Z3_L_TRUE) {
+              cout << "Detect at (" << i << "," << j << ") of type " << id
+                   << endl;
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
+
   for (int t = 1; t <= time; t++) {
     char file_name[128];
     sprintf(file_name, "time%d.dot", t);
@@ -114,6 +146,8 @@ void Solver::print(const model &model) {
     out << "digraph step {rankdir=LR;node "
            "[shape=record,fontname=\"Inconsolata\"];"
         << endl;
+
+    // dispenser
     out << "dispenser [label=\"Dispensers:|";
     bool first_dispenser = true;
     for (int i = 0; i < graph.nodes.size(); i++) {
@@ -132,6 +166,7 @@ void Solver::print(const model &model) {
     }
     out << "\"];" << endl;
 
+    // sink
     out << "sink [label=\"Sinks:|";
     bool first_sink = true;
     for (int j = 0; j < 2 * (width + height); j++) {
@@ -143,6 +178,30 @@ void Solver::print(const model &model) {
         }
         out << "<s" << j << ">"
             << "S";
+      }
+    }
+    out << "\"];" << endl;
+
+    // detector
+    out << "detector [label=\"Detectors:|";
+    bool first_detector = true;
+    for (int i = 0; i < height; i++) {
+      for (int j = 0; j < width; j++) {
+        for (int id = 0; id < graph.nodes.size(); id++) {
+          for (auto &edge : graph.edges) {
+            if (edge.first == id && graph.nodes[edge.second].type == DETECT) {
+              if (model.eval(detector[i][j][id]).bool_value() == Z3_L_TRUE) {
+                if (first_detector) {
+                  first_detector = false;
+                } else {
+                  out << "|";
+                }
+                out << "<D" << i << j << ">" << id;
+              }
+              break;
+            }
+          }
+        }
       }
     }
     out << "\"];" << endl;
@@ -159,7 +218,8 @@ void Solver::print(const model &model) {
 
         bool flag = false;
         for (auto &node : graph.nodes) {
-          if (node.type == DISPENSE || node.type == MIX) {
+          if (node.type == DISPENSE || node.type == MIX ||
+              node.type == DETECT) {
             if (model.eval(c[i][j][node.id][t]).bool_value() == Z3_L_TRUE) {
               cout << node.id << " ";
               if (j != width - 1) {
@@ -172,22 +232,34 @@ void Solver::print(const model &model) {
           }
         }
         if (!flag) {
-          bool mixing = false;
+          bool mixing_or_detecting = false;
           for (int id = 0; id < graph.nodes.size(); id++) {
-            if (model.eval(c[i][j][graph.nodes.size() + id][t]).bool_value() ==
-                Z3_L_TRUE) {
-              mixing = true;
-              cout << "M ";
-              if (j != width - 1) {
-                out << "M"
-                    << "|";
-              } else {
-                out << "M";
+            if (graph.nodes[id].type == DETECT || graph.nodes[id].type == MIX) {
+              if (model.eval(c[i][j][graph.nodes.size() + id][t])
+                      .bool_value() == Z3_L_TRUE) {
+                mixing_or_detecting = true;
+                if (graph.nodes[id].type == MIX)
+                  cout << "M ";
+                else
+                  cout << "D ";
+                if (j != width - 1) {
+                  if (graph.nodes[id].type == MIX)
+                    out << "M"
+                        << "|";
+                  else
+                    out << "D"
+                        << "|";
+                } else {
+                  if (graph.nodes[id].type == MIX)
+                    out << "M";
+                  else
+                    out << "D";
+                }
+                break;
               }
-              break;
             }
           }
-          if (!mixing) {
+          if (!mixing_or_detecting) {
             cout << "* ";
             if (j != width - 1) {
               out << "E"
@@ -248,6 +320,22 @@ void Solver::print(const model &model) {
       }
     }
 
+    // detect
+    for (int i = 0; i < height; i++) {
+      for (int j = 0; j < width; j++) {
+        for (int id = 0; id < graph.nodes.size(); id++) {
+          for (auto &edge : graph.edges) {
+            if (edge.first == id && graph.nodes[edge.second].type == DETECT) {
+              if (model.eval(detector[i][j][id]).bool_value() == Z3_L_TRUE) {
+                out << "detector:D" << i << j << " -> board:f" << i << j << endl;
+              }
+              break;
+            }
+          }
+        }
+      }
+    }
+
     out << "}" << endl;
     out.close();
     char cmd_line[128];
@@ -270,9 +358,11 @@ void Solver::add_consistency(context &ctx) {
             vec.push_back(c[i][j][node.id][t]);
           }
         }
-        // Mixing nodes
+        // Mixing/detecting nodes
         for (int id = 0; id < graph.nodes.size(); id++) {
-          vec.push_back(c[i][j][graph.nodes.size() + id][t]);
+          if (graph.nodes[id].type == DETECT || graph.nodes[id].type == MIX) {
+            vec.push_back(c[i][j][graph.nodes.size() + id][t]);
+          }
         }
         consistency1_vec.push_back(atmost(vec, 1));
       }
@@ -284,7 +374,7 @@ void Solver::add_consistency(context &ctx) {
   // step
   expr_vector consistency2_vec(ctx);
   for (auto &node : graph.nodes) {
-    if (node.type == DISPENSE || node.type == MIX) {
+    if (node.type == DISPENSE || node.type == MIX || node.type == DETECT) {
       for (int t = 1; t <= time; t++) {
         expr_vector vec(ctx);
         for (int i = 0; i < height; i++) {
@@ -312,13 +402,24 @@ void Solver::add_consistency(context &ctx) {
     consistency3_vec.push_back(atmost(vec, 1));
   }
   solver.add(mk_and(consistency3_vec));
+
   // each cell may be occupied by at most one detector
-  // ignore detector for now
+  expr_vector consistency5_vec(ctx);
+  for (int i = 0; i < height; i++) {
+    for (int j = 0; j < width; j++) {
+      expr_vector vec(ctx);
+      for (int id = 0; id < graph.nodes.size(); id++) {
+        vec.push_back(detector[i][j][id]);
+      }
+      consistency5_vec.push_back(atmost(vec, 1));
+    }
+  }
+  solver.add(mk_and(consistency5_vec));
 
   // each droplet i should occur in at least one time
   expr_vector consistency4_vec(ctx);
   for (auto &node : graph.nodes) {
-    if (node.type == DISPENSE || node.type == MIX) {
+    if (node.type == DISPENSE || node.type == MIX || node.type == DETECT) {
       expr_vector vec(ctx);
       for (int t = 1; t <= time; t++) {
         for (int i = 0; i < height; i++) {
@@ -334,13 +435,29 @@ void Solver::add_consistency(context &ctx) {
 }
 
 void Solver::add_placement(context &ctx) {
-  // For detectors, we ensure that, over all possible (x,y)- cells, for every
-  // type l of fluids a detector is placed
-  // ignore detector for now
+  // For detectors, we ensure that, over all possible (x,y)- cells, for
+  // every type l of fluids a detector is placed
+  expr_vector placement1_vec(ctx);
+  for (int id = 0; id < graph.nodes.size(); id++) {
+    if (graph.nodes[id].type == DETECT) {
+      for (auto &edge : graph.edges) {
+        if (edge.second == id) {
+          expr_vector vec(ctx);
+          for (int i = 0; i < height; i++) {
+            for (int j = 0; j < width; j++) {
+              vec.push_back(detector[i][j][id]);
+            }
+          }
+          placement1_vec.push_back(mk_or(vec));
+        }
+      }
+    }
+  }
+  solver.add(mk_and(placement1_vec));
 
   // For dispensers and sinks, we proceed analogously: For
-  // every possible outside position p of the grid and every type of fluid l,
-  // we ensure that the desired amount of entities
+  // every possible outside position p of the grid and every type of fluid
+  // l, we ensure that the desired amount of entities
   expr_vector placement2_vec(ctx);
   for (int i = 0; i < graph.nodes.size(); i++) {
     if (graph.nodes[i].type == DISPENSE || graph.nodes[i].type == MIX) {
@@ -364,7 +481,8 @@ void Solver::add_placement(context &ctx) {
 
 void Solver::add_movement(context &ctx) {
   for (int i = 0; i < graph.nodes.size(); i++) {
-    if (graph.nodes[i].type == DISPENSE || graph.nodes[i].type == MIX) {
+    if (graph.nodes[i].type == DISPENSE || graph.nodes[i].type == MIX ||
+        graph.nodes[i].type == DETECT) {
       for (int x = 0; x < height; x++) {
         for (int y = 0; y < width; y++) {
           for (int t = 1; t <= time; t++) {
@@ -448,6 +566,36 @@ void Solver::add_movement(context &ctx) {
                   mix_vec.push_back(mk_and(mixing_vec));
 
                   vec.push_back(mk_and(mix_vec));
+                }
+              }
+            }
+
+            // If the node is a detector node
+            if (graph.nodes[i].type == DETECT) {
+              if (t >= graph.nodes[i].time + 2) {
+                for (auto &edges : graph.edges) {
+                  if (edges.second == i) {
+                    // only one forward edge
+                    expr_vector detect_vec(ctx);
+
+                    // there is a detector for edges.first here
+                    detect_vec.push_back(detector[x][y][edges.first]);
+                    // the liquid appears before detecting
+                    detect_vec.push_back(
+                        c[x][y][edges.first][t - graph.nodes[i].time - 1]);
+                    // the liquid disappear on detecting
+                    detect_vec.push_back(
+                        not(c[x][y][edges.first][t - graph.nodes[i].time]));
+                    // the new liquid appear after detecting
+
+                    for (int tt = t - graph.nodes[i].time; tt < t; tt++) {
+                      detect_vec.push_back(
+                          c[x][y][graph.nodes.size() + graph.nodes[i].id][tt]);
+                    }
+
+                    vec.push_back(mk_and(detect_vec));
+                    break;
+                  }
                 }
               }
             }

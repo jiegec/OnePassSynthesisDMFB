@@ -43,6 +43,7 @@ bool try_steps(const Graph &graph, int width, int height, int n) {
       cout << "Unsatisfiable" << endl;
     } else {
       cout << "Satisfiable" << endl;
+      cout << ans;
       auto model = ans.get_model();
       solver.print(model);
       return true;

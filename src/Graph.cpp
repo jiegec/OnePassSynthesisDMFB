@@ -78,7 +78,10 @@ Graph::Graph(const char *file) {
         this->num_output++;
       } else if (type == "DETECT") {
         node.type = DETECT;
-        // unfinished
+        node.drops = stoi(params[2]);
+        node.time = stoi(params[3]);
+        node.label = params[4];
+      } else {
         throw logic_error("Not supported graph node type");
       }
       this->nodes.emplace_back(move(node));

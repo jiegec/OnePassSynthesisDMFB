@@ -1,0 +1,11 @@
+graph "Tiny Dag" {
+0 [label="DIS1 0"]
+1 [label="DIS2 1"]
+2 [label="MIX1 2"]
+3 [label="DETECT1 3"]
+4 [label="OUT1 4"]
+0 -- 2
+1 -- 2
+2 -- 3
+3 -- 4
+}
