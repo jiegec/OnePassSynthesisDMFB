@@ -1,4 +1,4 @@
-% Created 2018-05-21 Mon 11:47
+% Created 2018-05-21 Mon 22:22
 % Intended LaTeX compiler: pdflatex
 \documentclass[11pt]{article}
 \usepackage[utf8]{inputenc}
@@ -38,11 +38,11 @@
 \tableofcontents
 
 \section{任务说明}
-\label{sec:orgd637b02}
+\label{sec:org7890733}
 这篇论文的目的是，将 DMFB （Digital Microfluidic Biochps）的合成路径问题转化为 SAT 问题，再采用 SAT Solver （本文中采用的是 z3 prover）解决。论文中针对不同类型的要求，添加了若干的变量和它们之间的约束关系，于是根据求得的结果可以反推得到实际的合成过程。
 
 \section{任务实现}
-\label{sec:org56536c1}
+\label{sec:org866e4be}
 \begin{enumerate}
 \item 使用 CMake 构建系统，把 z3 加入到依赖之中。
 \item 从 github.com/UCRMicrofludics/MFSimStatic 获取了一些测试数据，放在 testcase/Assays/ 下。
@@ -53,15 +53,23 @@
 \item 测试案例在目录 testcase/ 下，部分的运行结果放在了 solutions/ 的相应子目录下，可供查看运行结果。
 \end{enumerate}
 
+\section{结点编号约定}
+\label{sec:org4e918c1}
+\begin{enumerate}
+\item 输入格式与 MFSimStatic 相同，每个结点的编号从 1 连续增大。
+\item 显示在图片和动画中的数字为下标，即对应结点的编号减一。
+\item 合并操作、检测操作都会产生新的一个液滴，液滴对应的编号为这个操作自己的编号。
+\end{enumerate}
+
 \section{程序编译环境}
-\label{sec:org7afc7e1}
+\label{sec:orgc29ee50}
 \begin{enumerate}
 \item 操作系统： macOS
 \item 编译器： LLVM/Clang 6.0.0
 \end{enumerate}
 
 \section{遇到的问题和解决方案}
-\label{sec:orgc5999f0}
+\label{sec:org895ad27}
 \begin{enumerate}
 \item 输入的数据中未指明 mixing 所需要的区域的大小，目前是以 2x2 写在代码之中。
 \item 论文提供的 SAT 约束条件并不能保证不必要的液滴的出现和移动，这一点我采用让 SAT Solver 对结点总数最少进行优化得以解决。
