@@ -18,6 +18,7 @@
 
 #include <chrono>
 #include <iostream>
+#include <fstream>
 #include <z3++.h>
 
 using namespace std::chrono;
@@ -43,8 +44,11 @@ bool try_steps(const Graph &graph, int width, int height, int n) {
       cout << "Unsatisfiable" << endl;
     } else {
       cout << "Satisfiable" << endl;
-      cout << ans;
+      cout << "Printing sat constraints to sat.smt2" << endl;
+      ofstream out("sat.smt2");
+      out << ans;
       auto model = ans.get_model();
+      cout << "Printing to model:" << endl;
       solver.print(model);
       return true;
     }

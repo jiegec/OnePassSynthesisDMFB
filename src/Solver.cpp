@@ -95,6 +95,7 @@ Solver::Solver(context &ctx, const Graph &graph, int width, int height,
   add_consistency(ctx);
   add_placement(ctx);
   add_movement(ctx);
+  add_fluidic_constraint(ctx);
 }
 
 optimize &Solver::get_solver() { return solver; }
@@ -688,6 +689,65 @@ void Solver::add_movement(context &ctx) {
           }
           solver.add(not(mk_or(disappear_last)));
           break;
+        }
+      }
+    }
+  }
+}
+
+void Solver::add_fluidic_constraint(z3::context &ctx) {
+  for (int x = 0; x < height; x++) {
+    for (int y = 0; y < width; y++) {
+      for (int dx = -1; dx <= 1; dx++) {
+        for (int dy = -1; dy <= 1; dy++) {
+          int xx = x + dx;
+          int yy = y + dy;
+          if (0 <= xx && xx < height && 0 <= yy & yy < width) {
+            for (int i = 0; i < graph.nodes.size(); i++) {
+              if (graph.nodes[i].type == DISPENSE ||
+                  graph.nodes[i].type == MIX || graph.nodes[i].type == DETECT) {
+                for (int j = 0; j < graph.nodes.size(); j++) {
+                  if (graph.nodes[j].type == DISPENSE ||
+                      graph.nodes[j].type == MIX ||
+                      graph.nodes[j].type == DETECT) {
+                    if (i != j) {
+                      // node i at (x,y)
+                      // node j at (xx, yy)
+
+                      // static fluidic constraint
+                      // they should disappear at time t+1
+                      // time from 1 to time-1
+                      for (int t = 1;t < time;t++) {
+                        expr_vector vec(ctx);
+                        for (int new_x = 0;new_x < height;new_x ++) {
+                          for (int new_y = 0;new_y < width;new_y ++) {
+                            vec.push_back(c[new_x][new_y][i][t+1]);
+                            vec.push_back(c[new_x][new_y][j][t+1]);
+                          }
+                        }
+                        solver.add(implies(c[x][y][i][t] && c[xx][yy][j][t], not(mk_or(vec))));
+                      }
+
+                      // dynamic fluidic constraint
+                      // i should disappear at time t+1
+                      // j should disappear at time t+2
+                      // time from 1 to time-2
+                      for (int t = 1;t < time-1;t++) {
+                        expr_vector vec(ctx);
+                        for (int new_x = 0;new_x < height;new_x ++) {
+                          for (int new_y = 0;new_y < width;new_y ++) {
+                            vec.push_back(c[new_x][new_y][i][t+1]);
+                            vec.push_back(c[new_x][new_y][j][t+2]);
+                          }
+                        }
+                        solver.add(implies(c[x][y][i][t] && c[xx][yy][j][t+1], not(mk_or(vec))));
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }

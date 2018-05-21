@@ -5,10 +5,12 @@
 
 * 任务实现
 1. 使用 CMake 构建系统，把 z3 加入到依赖之中。
-2. 从 github.com/UCRMicrofludics/MFSimStatic 获取了一些测试数据，放在 testcase/Assays 下
+2. 从 github.com/UCRMicrofludics/MFSimStatic 获取了一些测试数据，放在 testcase/Assays/ 下。
 3. 采用了上述测试数据的文件格式，编写了 ={Node,Graph}.{h,cpp}= 进行流程图的读入和解析，并且可以输出到 dot 文件再通过 graphviz 打印出 png 图片。
 4. 在 =Solver.{h,cpp}= 中实现了主要的功能，包括：创建相关的变量，然后根据不同类型的约束条件，在不同的函数里添加到 SAT Solver 中，然后要求 SAT Solver 输出结点总数最少的结果，最后从结果中还原出合成的完整过程，然后输出到文件并合成为 gif 动画。
 5. 支持的结点类型：DISPENSE, MIX, DETECT, OUTPUT 。由于 SPLIT 和 DILUTE 在论文中没有相关的约束条件，不予实现。
+6. 实现了 fluidic constraint ，方法是如果两个液滴接近，那么液滴将会被合并。
+7. 测试案例在目录 testcase/ 下，部分的运行结果放在了 solutions/ 的相应子目录下，可供查看运行结果。
 
 * 程序编译环境
 1. 操作系统： macOS
@@ -17,4 +19,4 @@
 * 遇到的问题和解决方案
 1. 输入的数据中未指明 mixing 所需要的区域的大小，目前是以 2x2 写在代码之中。
 2. 论文提供的 SAT 约束条件并不能保证不必要的液滴的出现和移动，这一点我采用让 SAT Solver 对结点总数最少进行优化得以解决。
-3. 使用 z3 过程中遇到了它代码中的 BUG ，已提交到上游等待修复，在我的代码中则选择绕过了它。
+3. 使用 z3 过程中遇到了它代码中的 BUG ，已提交到上游并且在 master 分支已经修复，在我的代码中则选择绕过了它。

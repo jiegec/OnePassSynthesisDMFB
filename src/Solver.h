@@ -34,6 +34,7 @@ class Solver {
   void add_consistency(z3::context &c);
   void add_placement(z3::context &c);
   void add_movement(z3::context &c);
+  void add_fluidic_constraint(z3::context &c);
 
 
   z3::optimize solver;
